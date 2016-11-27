@@ -31,6 +31,7 @@
 
 #include "sr_dumper.h"
 #include "sr_router.h"
+#include "sr_nat.h"
 #include "sr_rt.h"
 
 extern char* optarg;
@@ -56,6 +57,7 @@ static void sr_load_rt_wrap(struct sr_instance* sr, char* rtable);
 
 int main(int argc, char **argv)
 {
+    int ntrue = 0;
     int c;
     char *host   = DEFAULT_HOST;
     char *user = 0;
@@ -69,7 +71,7 @@ int main(int argc, char **argv)
 
     printf("Using %s\n", VERSION_INFO);
 
-    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:")) != EOF)
+    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n")) != EOF)
     {
         switch (c)
         {
@@ -100,6 +102,10 @@ int main(int argc, char **argv)
                 break;
             case 'T':
                 template = optarg;
+                break;
+            case 'n':
+                ntrue = 1;
+                
                 break;
         } /* switch */
     } /* -- while -- */
@@ -158,7 +164,12 @@ int main(int argc, char **argv)
 
     /* call router init (for arp subsystem etc.) */
     sr_init(&sr);
-
+    if(ntrue){
+        printf("hehehehehehehe\n");
+        struct sr_nat nat;
+        sr_nat_init(&nat);
+    }
+    
     /* -- whizbang main loop ;-) */
     while( sr_read_from_server(&sr) == 1);
 
