@@ -71,7 +71,7 @@ void sr_init(struct sr_instance* sr)
  *
  *---------------------------------------------------------------------*/
 
-void sr_handlepacket(struct sr_instance* sr,
+void sr_handlepacket(struct sr_instance *sr,
         uint8_t * packet/* lent */,
         unsigned int len,
         char* interface/* lent */)
