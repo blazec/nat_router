@@ -5,6 +5,12 @@
 #include <inttypes.h>
 #include <time.h>
 #include <pthread.h>
+#include "sr_if.h"
+#include "sr_rt.h"
+#include "sr_router.h"
+#include "sr_protocol.h"
+#include "sr_arpcache.h"
+#include "sr_utils.h"
 
 typedef enum {
   nat_mapping_icmp,
@@ -41,7 +47,7 @@ struct sr_nat {
 };
 
 
-int   sr_nat_init(struct sr_nat *nat);     /* Initializes the nat */
+int   sr_nat_init(struct sr_instance *sr);     /* Initializes the nat */
 int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
 

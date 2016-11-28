@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     unsigned int topo = DEFAULT_TOPO;
     char *logfile = 0;
     struct sr_instance sr;
-
+    struct sr_nat nat;
     printf("Using %s\n", VERSION_INFO);
 
     while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n")) != EOF)
@@ -166,8 +166,8 @@ int main(int argc, char **argv)
     sr_init(&sr);
     if(ntrue){
         printf("hehehehehehehe\n");
-        struct sr_nat nat;
-        sr_nat_init(&nat);
+        sr.nat = &nat;
+        sr_nat_init(&sr);
     }
     
     /* -- whizbang main loop ;-) */

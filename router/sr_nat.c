@@ -7,9 +7,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include "sr_if.h"
+#include "sr_rt.h"
+#include "sr_router.h"
+#include "sr_protocol.h"
+#include "sr_arpcache.h"
+#include "sr_utils.h"
 
-int sr_nat_init(struct sr_nat *nat) { /* Initializes the nat */
-
+int sr_nat_init(struct sr_instance *sr) { /* Initializes the nat */
+  assert(sr);
+  struct sr_nat *nat = sr->nat;
   assert(nat);
 
   /* Acquire mutex lock */
@@ -66,7 +73,7 @@ void *sr_nat_timeout(void *nat_ptr) {  /* Periodic Timout handling */
     time_t curtime = time(NULL);
 
     /* handle periodic tasks here */
-    
+
 
     pthread_mutex_unlock(&(nat->lock));
   }
