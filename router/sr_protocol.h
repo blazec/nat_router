@@ -83,6 +83,8 @@ struct sr_icmp_hdr {
   uint8_t icmp_type;
   uint8_t icmp_code;
   uint16_t icmp_sum;
+  uint16_t icmp_id;
+  uint16_t icmp_seq;
   
 } __attribute__ ((packed)) ;
 typedef struct sr_icmp_hdr sr_icmp_hdr_t;
@@ -132,6 +134,31 @@ struct sr_ip_hdr
     uint32_t ip_src, ip_dst;	/* source and dest address */
   } __attribute__ ((packed)) ;
 typedef struct sr_ip_hdr sr_ip_hdr_t;
+
+/*
+  structures for tcp header
+*/
+struct sr_tcp_hdr{
+  uint16_t source; /*source port*/
+  uint16_t destination; /*destination port*/
+  uint32_t sequence_number; /*sequence number*/
+  uint32_t ack_number;
+  uint8_t unused;
+  uint8_t flags; /*[i=3+j=3+k=10], i is data offset, j is reserved, and k are the flags*/
+  uint16_t window_size;
+  uint16_t checksum;
+  uint16_t urgent_pointer;
+};
+typedef struct sr_tcp_hdr sr_tcp_hdr_t;
+
+struct sr_tcp_pshdr
+  {
+    uint32_t  ip_src, ip_dst;
+    uint8_t   reserved;
+    uint8_t   ip_p;
+    uint16_t  len;
+  }__attribute__ ((packed)) ;
+typedef struct sr_tcp_pshdr sr_tcp_pshdr_t;
 
 /* 
  *  Ethernet packet header prototype.  Too many O/S's define this differently.
