@@ -12,6 +12,20 @@
 #include "sr_arpcache.h"
 #include "sr_utils.h"
 
+#define MAX_HOSTS 256 
+#define MIN_PORT 1024
+#define MAX_PORT 65535
+#define FIN 1
+#define SYN 2
+#define RST 4
+#define PSH 8
+#define ACK 16
+#define URG 32
+#define ECE 64
+#define CWR 128
+#define NS 256
+#define MAX_PACKET_VOL 1024
+
 typedef enum {
   nat_mapping_icmp,
   nat_mapping_tcp
@@ -38,7 +52,13 @@ struct sr_nat_mapping {
 struct sr_nat {
   /* add any fields here */
   struct sr_nat_mapping *mappings;
+  uint32_t ip_ext;
+  uint16_t next_port;
 
+  /* timeout values */
+  uint16_t icmp_to;
+  uint16_t tcp_establish_to;
+  uint16_t tcp_transitory_to;
   /* threading */
   pthread_mutex_t lock;
   pthread_mutexattr_t attr;
@@ -50,6 +70,7 @@ struct sr_nat {
 int   sr_nat_init(struct sr_instance *sr);     /* Initializes the nat */
 int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
+void sr_nat_ext_ip(struct sr_instance* sr);
 
 /* Get the mapping associated with given external port.
    You must free the returned structure if it is not NULL. */
@@ -64,7 +85,7 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 /* Insert a new mapping into the nat's mapping table.
    You must free the returned structure if it is not NULL. */
 struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
-  uint32_t ip_int, uint32_t ip_ext, uint16_t aux_int, uint16_t aux_ext, 
+  uint32_t ip_int,  uint16_t aux_int,  
   sr_nat_mapping_type type );
 
 

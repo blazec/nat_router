@@ -23,6 +23,7 @@
 #include "sr_protocol.h"
 #include "sr_arpcache.h"
 #include "sr_utils.h"
+#include "sr_nat.h"
 
 #define OP_ARP_REQUEST 1
 #define OP_ARP_REPLY 2
@@ -52,7 +53,7 @@ void sr_init(struct sr_instance* sr)
     pthread_create(&thread, &(sr->attr), sr_arpcache_timeout, sr);
     
     /* Add initialization code here! */
-
+    
 } /* -- sr_init -- */
 
 /*---------------------------------------------------------------------
@@ -181,7 +182,10 @@ void handle_ip(struct sr_instance* sr,
 
 	/* check if this packet is for one of the router's interfaces*/
 	iface = sr_get_interface_byip(sr, iphdr->ip_dst);
-	if(iface){
+	if(sr->nat && iphdr->ip_dst==sr->nat->ip_ext){
+		handle_nat(sr, packet, name, FORWARD);
+	}
+	else if(iface){
 		printf("%d\n", ntohl(iphdr->ip_src));
 		if(iphdr->ip_p == ip_protocol_icmp){
 			
@@ -221,14 +225,25 @@ void handle_ip(struct sr_instance* sr,
 		iphdr->ip_ttl--;
 		iphdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
 
-		if (sr_send_packet(sr, packet, len, iface->name) == -1 ) {
-			fprintf(stderr, "CANNOT FORWARD IP PACKET \n");
+		if(sr->nat && sr->nat->ip_ext != iphdr->ip_src){
+			handle_nat(sr, packet, name, FORWARD);
 		}
+		else{
+			if (sr_send_packet(sr, packet, len, iface->name) == -1 ) {
+				fprintf(stderr, "CANNOT FORWARD IP PACKET \n");
+			}
+		}
+		
 		
 	}
 	else if(outgoing_iface[0]!=0){ 
+		if(sr->nat){
+			handle_nat(sr, packet, name, QUEUE);
+		}else{
+			sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
+		}
 		
-		sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
+		
 	}
 	else{
 		iface = sr_get_interface(sr, name);
@@ -428,3 +443,24 @@ void send_arpreply(struct sr_instance* sr,
 	
 }
 
+void handle_nat(struct sr_instance* sr,
+				uint8_t* packet,
+				const char* name,
+				int action){
+
+	int aux_int;
+
+	uint8_t* ip_data = packet +  sizeof(sr_ethernet_hdr_t);
+	sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(ip_data);
+	struct sr_arpcache *cache = &(sr->cache);
+
+	uint8_t* icmp_data = packet +  sizeof(sr_ethernet_hdr_t)+  sizeof(sr_ip_hdr_t);
+	sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)icmp_data;
+	if(action == QUEUE){
+		if(iphdr->ip_p == ip_protocol_icmp){
+			aux_int = ntohs(icmp_hdr->icmp_id);
+			sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_icmp);
+			/*sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);*/
+		}
+	}
+}

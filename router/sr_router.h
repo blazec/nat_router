@@ -29,6 +29,8 @@
 
 #define INIT_TTL 255
 #define PACKET_DUMP_SIZE 1024
+#define QUEUE 2
+#define FORWARD 1
 
 /* forward declare */
 struct sr_if;
@@ -73,7 +75,7 @@ void handle_ip(struct sr_instance* sr, uint8_t * packet/* lent */,unsigned int l
 void handle_icmp(struct sr_instance* sr, uint8_t * packet, int len, struct sr_if* iface, int type, int code);
 void send_arprequest(struct sr_instance* sr, uint32_t ip, char* name);
 void send_arpreply(struct sr_instance* sr, uint8_t* packet, unsigned int len, const char* name);
-
+void handle_nat(struct sr_instance* sr, uint8_t* packet, const char* name, int action);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );

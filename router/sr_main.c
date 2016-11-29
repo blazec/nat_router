@@ -167,9 +167,12 @@ int main(int argc, char **argv)
     if(ntrue){
         printf("hehehehehehehe\n");
         sr.nat = &nat;
+        printf("check 1\n");
         sr_nat_init(&sr);
     }
-    
+    else{
+        sr.nat=NULL;
+    } 
     /* -- whizbang main loop ;-) */
     while( sr_read_from_server(&sr) == 1);
 

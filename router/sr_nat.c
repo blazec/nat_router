@@ -31,10 +31,12 @@ int sr_nat_init(struct sr_instance *sr) { /* Initializes the nat */
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
   pthread_create(&(nat->thread), &(nat->thread_attr), sr_nat_timeout, nat);
-
+printf("check 2\n");
   /* CAREFUL MODIFYING CODE ABOVE THIS LINE! */
 
   nat->mappings = NULL;
+  nat->next_port = MIN_PORT;
+  printf("check 1\n");
   /* Initialize any variables here */
 
   return success;
@@ -128,8 +130,7 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
    Actually returns a copy to the new mapping, for thread safety.
  */
 struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
-  uint32_t ip_int, uint32_t ip_ext, uint16_t aux_int, uint16_t aux_ext, 
-  sr_nat_mapping_type type ) {
+  uint32_t ip_int, uint16_t aux_int, sr_nat_mapping_type type ) {
 
   pthread_mutex_lock(&(nat->lock));
 
@@ -141,11 +142,18 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   mapping->ip_int = ip_int;
   mapping->aux_int = aux_int;
   mapping->type = type;
-  mapping->ip_ext = ip_ext;
-  mapping->aux_ext = aux_ext;
+  mapping->ip_ext = nat->ip_ext;
+  mapping->aux_ext = nat->next_port;
   mapping->last_updated = curtime;
   mapping->next = NULL;
 
+  if(nat->next_port>MAX_PORT){
+    nat->next_port=MIN_PORT;
+  }
+  else{
+    nat->next_port++;
+  }
+  
   if(nat->mappings){
     runner = nat->mappings;
     while(runner->next){
@@ -162,4 +170,13 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
 
   pthread_mutex_unlock(&(nat->lock));
   return copy;
+}
+
+void sr_nat_ext_ip(struct sr_instance* sr)
+{
+    struct sr_nat* nat = sr->nat;
+    pthread_mutex_lock(&(nat->lock));
+    nat->ip_ext = sr_get_interface(sr,"eth2")->ip;
+
+    pthread_mutex_unlock(&(nat->lock));
 }
