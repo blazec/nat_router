@@ -31,7 +31,7 @@ int sr_nat_init(struct sr_instance *sr) { /* Initializes the nat */
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
   pthread_create(&(nat->thread), &(nat->thread_attr), sr_nat_timeout, nat);
-printf("check 2\n");
+  printf("check 2\n");
   /* CAREFUL MODIFYING CODE ABOVE THIS LINE! */
 
   nat->mappings = NULL;
@@ -93,7 +93,7 @@ struct sr_nat_mapping *sr_nat_lookup_external(struct sr_nat *nat,
   struct sr_nat_mapping *copy = NULL, *mapping = NULL;
   mapping = nat->mappings;
   while(mapping){
-    if(mapping->aux_ext == aux_ext){
+    if(mapping->aux_ext == aux_ext && mapping->type == type){
       copy = (struct sr_nat_mapping *) malloc(sizeof(struct sr_nat_mapping));
       memcpy(copy, mapping, sizeof(struct sr_nat_mapping));
     }
@@ -115,7 +115,7 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
   struct sr_nat_mapping *copy = NULL, *mapping = NULL;
   mapping = nat->mappings;
   while(mapping){
-    if(mapping->aux_int == aux_int && mapping->ip_int == ip_int){
+    if(mapping->aux_int == aux_int && mapping->ip_int == ip_int && mapping->type == type){
       copy = (struct sr_nat_mapping *) malloc(sizeof(struct sr_nat_mapping));
       memcpy(copy, mapping, sizeof(struct sr_nat_mapping));
     }
@@ -143,7 +143,13 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   mapping->aux_int = aux_int;
   mapping->type = type;
   mapping->ip_ext = nat->ip_ext;
-  mapping->aux_ext = nat->next_port;
+  if (type == nat_mapping_icmp){
+    mapping->aux_ext = aux_int;
+  }
+  else{
+    mapping->aux_ext = nat->next_port;
+  }
+  
   mapping->last_updated = curtime;
   mapping->next = NULL;
 

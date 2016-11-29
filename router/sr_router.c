@@ -53,7 +53,7 @@ void sr_init(struct sr_instance* sr)
     pthread_create(&thread, &(sr->attr), sr_arpcache_timeout, sr);
     
     /* Add initialization code here! */
-    
+
 } /* -- sr_init -- */
 
 /*---------------------------------------------------------------------
@@ -170,8 +170,6 @@ void handle_ip(struct sr_instance* sr,
 
 	sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t*) packet;
 
-	
-
 	if((iphdr->ip_p == ip_protocol_icmp) && (icmp_hdr->icmp_type == 3) && (icmp_hdr->icmp_code == 1)){
 		printf("IM HERE with %s\n", name);
 			iface = sr_get_interface(sr, name);
@@ -183,7 +181,9 @@ void handle_ip(struct sr_instance* sr,
 	/* check if this packet is for one of the router's interfaces*/
 	iface = sr_get_interface_byip(sr, iphdr->ip_dst);
 	if(sr->nat && iphdr->ip_dst==sr->nat->ip_ext){
-		handle_nat(sr, packet, name, FORWARD);
+		handle_nat(sr, packet, len, name, FORWARD);
+		printf("it hath returned\n");
+		return;
 	}
 	else if(iface){
 		printf("%d\n", ntohl(iphdr->ip_src));
@@ -226,7 +226,7 @@ void handle_ip(struct sr_instance* sr,
 		iphdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
 
 		if(sr->nat && sr->nat->ip_ext != iphdr->ip_src){
-			handle_nat(sr, packet, name, FORWARD);
+			handle_nat(sr, packet, len, name, FORWARD);
 		}
 		else{
 			if (sr_send_packet(sr, packet, len, iface->name) == -1 ) {
@@ -238,7 +238,7 @@ void handle_ip(struct sr_instance* sr,
 	}
 	else if(outgoing_iface[0]!=0){ 
 		if(sr->nat){
-			handle_nat(sr, packet, name, QUEUE);
+			handle_nat(sr, packet, len, name, QUEUE);
 		}else{
 			sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
 		}
@@ -395,7 +395,8 @@ void send_arprequest(struct sr_instance* sr, uint32_t ip, char* name)
 void send_arpreply(struct sr_instance* sr,
 				uint8_t* packet,
 				unsigned int len,
-				const char* name) {
+				const char* name)
+{
 
 	/*sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet);*/
 					
@@ -445,22 +446,78 @@ void send_arpreply(struct sr_instance* sr,
 
 void handle_nat(struct sr_instance* sr,
 				uint8_t* packet,
+				int len,
 				const char* name,
 				int action){
 
+	char outgoing_iface[sr_IFACE_NAMELEN];
+	bzero(outgoing_iface, sr_IFACE_NAMELEN);
 	int aux_int;
-
+	struct sr_nat_mapping *copy;
 	uint8_t* ip_data = packet +  sizeof(sr_ethernet_hdr_t);
 	sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(ip_data);
 	struct sr_arpcache *cache = &(sr->cache);
+	sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t*) packet;
 
 	uint8_t* icmp_data = packet +  sizeof(sr_ethernet_hdr_t)+  sizeof(sr_ip_hdr_t);
 	sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)icmp_data;
-	if(action == QUEUE){
-		if(iphdr->ip_p == ip_protocol_icmp){
+
+	if(iphdr->ip_p == ip_protocol_icmp){
+		if(iphdr->ip_dst==sr->nat->ip_ext){
+			
 			aux_int = ntohs(icmp_hdr->icmp_id);
-			sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_icmp);
-			/*sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);*/
+			copy = sr_nat_lookup_external(sr->nat, aux_int, nat_mapping_icmp);
+			if(copy){
+				iphdr->ip_dst = copy->ip_int;
+				struct sr_arpentry* entry = sr_arpcache_lookup(cache, iphdr->ip_dst);
+				sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
+				if(entry && entry->valid == 1){/*cache hit*/
+					
+					struct sr_if* iface = sr_get_interface(sr, outgoing_iface);
+					memcpy(eth_hdr->ether_dhost, entry->mac, sizeof(uint8_t)*ETHER_ADDR_LEN);
+					memcpy(eth_hdr->ether_shost, iface->addr, sizeof(uint8_t)*ETHER_ADDR_LEN);
+
+					iphdr->ip_sum = 0;
+					iphdr->ip_ttl--;
+					iphdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
+					if (sr_send_packet(sr, packet, len, iface->name) == -1 ) {
+						fprintf(stderr, "CANNOT FORWARD IP PACKET \n");
+					}
+				}
+				else{
+					sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
+				}
+			}
+			
+			return;
+		}
+
+
+
+		if(action == QUEUE){
+			aux_int = ntohs(icmp_hdr->icmp_id);
+			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_icmp);
+			if(copy==NULL){
+				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_icmp);
+			}
+			iphdr->ip_src = copy->ip_ext;
+			sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
+			sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
+			
+		}
+		else if(action == FORWARD){
+			aux_int = ntohs(icmp_hdr->icmp_id);
+			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_icmp);
+			if(copy==NULL){
+				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_icmp);
+			}
+			iphdr->ip_src = copy->ip_ext;
+			iphdr->ip_sum = 0;
+			iphdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
+			sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
+			if (sr_send_packet(sr, packet, len, outgoing_iface) == -1 ) {
+				fprintf(stderr, "CANNOT FORWARD IP PACKET \n");
+			}
 		}
 	}
 }
