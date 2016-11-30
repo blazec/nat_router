@@ -70,8 +70,11 @@ int main(int argc, char **argv)
     struct sr_instance sr;
     struct sr_nat nat;
     printf("Using %s\n", VERSION_INFO);
+    int icmp_to=60;
+    int tcp_est_to=7440;
+    int tcp_trans_to=300;
 
-    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:n")) != EOF)
+    while ((c = getopt(argc, argv, "hs:v:p:u:t:r:l:T:nI:E:R:")) != EOF)
     {
         switch (c)
         {
@@ -105,7 +108,15 @@ int main(int argc, char **argv)
                 break;
             case 'n':
                 ntrue = 1;
-                
+                break;
+            case 'I':
+                icmp_to = atoi((char *) optarg);
+                break;
+            case 'E':
+                tcp_est_to = atoi((char *) optarg);
+                break;
+            case 'R':
+                tcp_trans_to = atoi((char *) optarg);
                 break;
         } /* switch */
     } /* -- while -- */
@@ -167,7 +178,7 @@ int main(int argc, char **argv)
     if(ntrue){
         printf("hehehehehehehe\n");
         sr.nat = &nat;
-        sr_nat_init(&sr);
+        sr_nat_init(&sr,icmp_to,tcp_est_to,tcp_trans_to);
     }
     else{
         sr.nat=NULL;
@@ -193,7 +204,9 @@ static void usage(char* argv0)
     printf("           [-T template_name] [-u username] \n");
     printf("           [-t topo id] [-r routing table] \n");
     printf("           [-l log file] \n");
-    printf("   defaults server=%s port=%d host=%s  \n",
+    printf("           [-n] [-I ICMP timeout] \n");
+    printf("           [-E TCP ESTABLISHED timeout] [-R TCP TRANSISTORY timeout] \n");
+    printf("   defaults server=%s port=%d host=%s  \n   ICMP timeout=30 TCP ESTABLISHED timeout = 7440 TCP TRANSISTORY timeout = 300\n",
             DEFAULT_SERVER, DEFAULT_PORT, DEFAULT_HOST );
 } /* -- usage -- */
 

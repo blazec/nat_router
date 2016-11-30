@@ -76,8 +76,8 @@ struct sr_nat {
 
   /* timeout values */
   uint16_t icmp_to;
-  uint16_t tcp_establish_to;
-  uint16_t tcp_transitory_to;
+  uint16_t tcp_est_to;
+  uint16_t tcp_trans_to;
   /* threading */
   pthread_mutex_t lock;
   pthread_mutexattr_t attr;
@@ -86,10 +86,12 @@ struct sr_nat {
 };
 
 
-int   sr_nat_init(struct sr_instance *sr);     /* Initializes the nat */
+int sr_nat_init(struct sr_instance *sr, int tcmp_to, int tcp_est_to, int tcp_trans_to);     /* Initializes the nat */
 int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
 void sr_nat_delete_mapping(struct sr_nat *nat, struct sr_nat_mapping *map);
+void sr_nat_delete_conn(struct sr_nat_mapping *mapping, struct sr_nat_connection *prev, 
+  struct sr_nat_connection *conn);
 
 void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *map, 
   uint8_t * packet, int len, int direction);

@@ -19,7 +19,7 @@
 #include <string.h>
 
 
-int sr_nat_init(struct sr_instance *sr) { /* Initializes the nat */
+int sr_nat_init(struct sr_instance *sr, int icmp_to, int tcp_est_to, int tcp_trans_to) { /* Initializes the nat */
   assert(sr);
   struct sr_nat *nat = sr->nat;
   assert(nat);
@@ -41,6 +41,14 @@ int sr_nat_init(struct sr_instance *sr) { /* Initializes the nat */
 
   nat->mappings = NULL;
   nat->next_port = MIN_PORT;
+
+  nat->icmp_to=icmp_to;
+  nat->tcp_est_to=tcp_est_to;
+  nat->tcp_trans_to=tcp_trans_to;
+  
+  printf("ICMP TIMEOUT: %d\n", icmp_to);
+  printf("TCP EST TIMEOUT: %d\n", tcp_est_to);
+  printf("ICMP TIMEOUT: %d\n", tcp_trans_to);
 
   /* Initialize any variables here */
 
@@ -86,7 +94,11 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
     struct sr_nat_mapping *mapping = nat->mappings;
     while(mapping){
       mapping_time = difftime(curtime,mapping->last_updated);
-      if(mapping->type==nat_mapping_tcp){
+      if (mapping->type == nat_mapping_icmp && mapping_time>=nat->icmp_to){
+        sr_nat_delete_mapping(nat,mapping);
+      }
+      else if(mapping->type==nat_mapping_tcp)
+      {
         if (mapping->conns == NULL){
           sr_nat_delete_mapping(nat,mapping);
         }
@@ -94,24 +106,26 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
           struct sr_nat_connection *prev=NULL, *conn = mapping->conns;
           while(conn){
             conn_time = difftime(curtime, conn->last_updated);
-            printf("timeee %d\n", conn_time);
-            if(conn_time>=6 && conn->packet != NULL){
+            if(conn_time>=nat->tcp_est_to && conn->state == nat_conn_est)
+            {
+              sr_nat_delete_conn(mapping, prev, conn);
+            }
+            else if(conn_time>=nat->tcp_trans_to && conn->state != nat_conn_est)
+            {
+              sr_nat_delete_conn(mapping, prev, conn);
+            }
+            else if(conn_time>=6 && conn->packet != NULL){
                 uint8_t* ip_data = conn->packet +  sizeof(sr_ethernet_hdr_t);
                 sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(ip_data);
 
                 sr_longest_prefix_iface(sr, iphdr->ip_src, outgoing_iface);
                 struct sr_if* iface = sr_get_interface(sr, outgoing_iface);
-                
+
                 printf(" naaaame %s\n", iface->name);
                 handle_icmp(sr, conn->packet, conn->len, iface, 3, 3);
                 
-                /*free(conn->packet);*/
-                if (prev){
-                  prev->next = conn->next;
-                }
-                else{
-                  mapping->conns = conn->next;
-                }
+                free(conn->packet);
+                sr_nat_delete_conn(mapping, prev, conn);
 
               }
               prev=conn;
@@ -127,6 +141,15 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
     pthread_mutex_unlock(&(nat->lock));
   }
   return NULL;
+}
+void sr_nat_delete_conn(struct sr_nat_mapping *mapping, struct sr_nat_connection *prev, 
+  struct sr_nat_connection *conn){
+  if (prev){
+    prev->next = conn->next;
+  }
+  else{
+    mapping->conns = conn->next;
+  }
 }
 
 /* Get the mapping associated with given external port.
@@ -288,6 +311,19 @@ void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *copy, uin
       mapping->conns = conn;
     }
   }
+
+  if(conn->state == nat_conn_syn){
+    /*Look for syn+ack*/  
+    if (tcp_header->flags == tcp_flag_syn+tcp_flag_ack){
+      conn->state=nat_conn_synack;
+    }
+  }
+  else if(conn->state == nat_conn_synack){
+    if (tcp_header->flags == tcp_flag_ack){
+        conn->state=nat_conn_est;
+      }
+  }
+
   conn->last_updated = time(NULL);
 
 

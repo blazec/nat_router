@@ -280,7 +280,7 @@ void handle_icmp(struct sr_instance* sr,
 	memcpy(icmp_payload, ip_data, sizeof(uint8_t)*ICMP_DATA_SIZE);
 
 	struct sr_arpentry* entry = sr_arpcache_lookup(cache, ip_hdr->ip_src);
-	sr_longest_prefix_iface(sr, ip_hdr->ip_src, outgoing_iface);
+	
 
 	uint8_t* icmp_data = packet +  sizeof(sr_ethernet_hdr_t)+  sizeof(sr_ip_hdr_t);
 
