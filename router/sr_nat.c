@@ -31,12 +31,12 @@ int sr_nat_init(struct sr_instance *sr) { /* Initializes the nat */
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
   pthread_attr_setscope(&(nat->thread_attr), PTHREAD_SCOPE_SYSTEM);
   pthread_create(&(nat->thread), &(nat->thread_attr), sr_nat_timeout, nat);
-  printf("check 2\n");
+  
   /* CAREFUL MODIFYING CODE ABOVE THIS LINE! */
 
   nat->mappings = NULL;
   nat->next_port = MIN_PORT;
-  printf("check 1\n");
+
   /* Initialize any variables here */
 
   return success;
@@ -152,6 +152,7 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   
   mapping->last_updated = curtime;
   mapping->next = NULL;
+  mapping->conns = NULL;
 
   if(nat->next_port>MAX_PORT){
     nat->next_port=MIN_PORT;
@@ -178,11 +179,64 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   return copy;
 }
 
-void sr_nat_ext_ip(struct sr_instance* sr)
-{
-    struct sr_nat* nat = sr->nat;
-    pthread_mutex_lock(&(nat->lock));
-    nat->ip_ext = sr_get_interface(sr,"eth2")->ip;
+void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *copy, uint8_t * packet, int len, int direction){
+  struct sr_nat *nat = sr->nat;
 
-    pthread_mutex_unlock(&(nat->lock));
+  sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(packet + sizeof(struct sr_ethernet_hdr));
+  assert(iphdr->ip_p == ip_protocol_tcp);
+  sr_tcp_hdr_t *tcp_header = (sr_tcp_hdr_t *)(packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct sr_ip_hdr));
+
+  pthread_mutex_lock(&(nat->lock));
+
+  struct sr_nat_mapping *mapping = nat->mappings;
+  while(mapping){
+    if (mapping->aux_ext == copy->aux_ext)
+      break;
+    mapping = mapping->next;
+  }
+  printf("check1\n");
+  if(direction == INCOMING){
+    uint32_t ip_dst = ntohs(iphdr->ip_src);
+    uint16_t aux_dst = ntohs(tcp_header->aux_src);
+  }
+  else{
+    uint32_t ip_dst = ntohs(iphdr->ip_dst);
+    uint16_t aux_dst = ntohs(tcp_header->aux_dst);
+  }
+  
+
+  struct sr_nat_connection *conn = mapping->conns;
+
+  while(conn){
+    if(conn->ip_dst == ip_dst && conn->aux_dst == aux_dst)
+      break;
+    conn=conn->next;
+  }
+  printf("check2\n");
+  if (conn==NULL){/*connection don't exist mon*/
+    if(tcp_header->flags != tcp_flag_syn){
+      pthread_mutex_unlock(&(nat->lock));
+      return;
+    }
+    struct sr_nat_connection *new_conn = malloc(sizeof(struct sr_nat_connection));
+    new_conn->ip_dst=ip_dst;
+    new_conn->aux_dst=aux_dst;
+    new_conn->state=nat_conn_syn;
+    new_conn->packet = NULL;
+    new_conn->next = NULL;
+
+    conn = mapping->conns;
+    if(conn){
+      while(conn->next){
+        conn=conn->next;
+      }
+      conn->next = new_conn;
+    }
+    else{
+      mapping->conns = new_conn;
+    }
+  }
+
+
+  pthread_mutex_unlock(&(nat->lock));
 }

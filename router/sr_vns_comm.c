@@ -40,6 +40,7 @@
 #include "sr_router.h"
 #include "sr_if.h"
 #include "sr_protocol.h"
+#include "sr_nat.h"
 
 #include "sha1.h"
 #include "vnscommand.h"
@@ -226,7 +227,7 @@ int sr_handle_hwinfo(struct sr_instance* sr, c_hwinfo* hwinfo)
         } /* -- switch -- */
     } /* -- for -- */
     if(sr->nat) {
-        sr_nat_ext_ip(sr);
+        sr->nat->ip_ext = sr_get_interface(sr,"eth2")->ip;
     }
     printf("Router interfaces:\n");
     sr_print_if_list(sr);

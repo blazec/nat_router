@@ -43,7 +43,7 @@ struct sr_if* sr_get_interface(struct sr_instance* sr, const char* name)
     assert(sr);
 
     if_walker = sr->if_list;
-
+    
     while(if_walker)
     {
        if(!strncmp(if_walker->name,name,sr_IFACE_NAMELEN))

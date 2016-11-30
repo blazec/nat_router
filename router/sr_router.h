@@ -76,6 +76,7 @@ void handle_icmp(struct sr_instance* sr, uint8_t * packet, int len, struct sr_if
 void send_arprequest(struct sr_instance* sr, uint32_t ip, char* name);
 void send_arpreply(struct sr_instance* sr, uint8_t* packet, unsigned int len, const char* name);
 void handle_nat(struct sr_instance* sr, uint8_t* packet, int len, const char* name, int action);
+uint16_t tcp_cksum(uint8_t* packet, int len);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );

@@ -25,6 +25,8 @@
 #define CWR 128
 #define NS 256
 #define MAX_PACKET_VOL 1024
+#define INCOMING 2
+#define OUTGOING 1
 
 typedef enum {
   nat_mapping_icmp,
@@ -32,9 +34,26 @@ typedef enum {
   /* nat_mapping_udp, */
 } sr_nat_mapping_type;
 
+typedef enum {
+  nat_conn_unest,
+  nat_conn_syn,
+  nat_conn_synack,
+  nat_conn_est,
+  nat_conn_fin1,
+  nat_conn_fin1ack,
+  nat_conn_fin2
+  /* nat_mapping_udp, */
+} sr_nat_conn_states;
+
 struct sr_nat_connection {
   /* add TCP connection state data members here */
+  uint32_t ip_dst;
+  uint16_t aux_dst;
 
+  sr_nat_conn_states state;
+
+  uint8_t* packet;
+  int time_wait;
   struct sr_nat_connection *next;
 };
 
@@ -70,7 +89,9 @@ struct sr_nat {
 int   sr_nat_init(struct sr_instance *sr);     /* Initializes the nat */
 int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
-void sr_nat_ext_ip(struct sr_instance* sr);
+
+void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *map, 
+  uint8_t * packet, int len);
 
 /* Get the mapping associated with given external port.
    You must free the returned structure if it is not NULL. */
@@ -87,6 +108,7 @@ struct sr_nat_mapping *sr_nat_lookup_internal(struct sr_nat *nat,
 struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   uint32_t ip_int,  uint16_t aux_int,  
   sr_nat_mapping_type type );
+
 
 
 #endif

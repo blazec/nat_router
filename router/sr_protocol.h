@@ -139,10 +139,10 @@ typedef struct sr_ip_hdr sr_ip_hdr_t;
   structures for tcp header
 */
 struct sr_tcp_hdr{
-  uint16_t source; /*source port*/
-  uint16_t destination; /*destination port*/
-  uint32_t sequence_number; /*sequence number*/
-  uint32_t ack_number;
+  uint16_t aux_src; /*source port*/
+  uint16_t aux_dst; /*destination port*/
+  uint32_t tcp_seq; /*sequence number*/
+  uint32_t tcp_ack;
   uint8_t unused;
   uint8_t flags; /*[i=3+j=3+k=10], i is data offset, j is reserved, and k are the flags*/
   uint16_t window_size;
@@ -179,6 +179,7 @@ typedef struct sr_ethernet_hdr sr_ethernet_hdr_t;
 
 enum sr_ip_protocol {
   ip_protocol_icmp = 0x0001,
+  ip_protocol_tcp = 0x0006,
 };
 
 enum sr_ethertype {
@@ -196,6 +197,16 @@ enum sr_arp_hrd_fmt {
   arp_hrd_ethernet = 0x0001,
 };
 
+enum sr_tcp_flags{
+  tcp_flag_fin = 0x0001,
+  tcp_flag_syn = 0x0002,
+  tcp_flag_rst = 0x0004,
+  tcp_flag_psh = 0x0008,
+  tcp_flag_ack = 0x0010,
+  tcp_flag_urg = 0x0020,
+  tcp_flag_ece = 0x0040,
+  tcp_flag_cwr = 0x0080,
+};
 
 struct sr_arp_hdr
 {

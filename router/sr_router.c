@@ -66,7 +66,7 @@ void sr_init(struct sr_instance* sr)
  * ethernet headers.
  *
  * Note: Both the packet buffer and the character's memory are handled
- * by sr_vns_comm.c that means do NOT delete either.  Make a copy of the
+ * by sr_vns_comm.c that means d NOT delete either.  Make a copy of the
  * packet instead if you intend to keep it around beyond the scope of
  * the method call.
  *
@@ -449,7 +449,7 @@ void handle_nat(struct sr_instance* sr,
 				int len,
 				const char* name,
 				int action){
-
+	struct sr_if* iface=0;
 	char outgoing_iface[sr_IFACE_NAMELEN];
 	bzero(outgoing_iface, sr_IFACE_NAMELEN);
 	int aux_int;
@@ -463,17 +463,21 @@ void handle_nat(struct sr_instance* sr,
 	sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t *)icmp_data;
 
 	if(iphdr->ip_p == ip_protocol_icmp){
+		aux_int = ntohs(icmp_hdr->icmp_id);
 		if(iphdr->ip_dst==sr->nat->ip_ext){
+
 			
-			aux_int = ntohs(icmp_hdr->icmp_id);
+			printf("%lu\n", aux_int);
 			copy = sr_nat_lookup_external(sr->nat, aux_int, nat_mapping_icmp);
+			
 			if(copy){
 				iphdr->ip_dst = copy->ip_int;
 				struct sr_arpentry* entry = sr_arpcache_lookup(cache, iphdr->ip_dst);
 				sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
+				iface = sr_get_interface(sr, outgoing_iface);
 				if(entry && entry->valid == 1){/*cache hit*/
 					
-					struct sr_if* iface = sr_get_interface(sr, outgoing_iface);
+					
 					memcpy(eth_hdr->ether_dhost, entry->mac, sizeof(uint8_t)*ETHER_ADDR_LEN);
 					memcpy(eth_hdr->ether_shost, iface->addr, sizeof(uint8_t)*ETHER_ADDR_LEN);
 
@@ -487,6 +491,11 @@ void handle_nat(struct sr_instance* sr,
 				else{
 					sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
 				}
+				free(copy);
+			}
+			else{
+				iface = sr_get_interface_byip(sr, iphdr->ip_dst);
+				handle_icmp(sr, packet, len, iface, 0, 0);
 			}
 			
 			return;
@@ -495,7 +504,7 @@ void handle_nat(struct sr_instance* sr,
 
 
 		if(action == QUEUE){
-			aux_int = ntohs(icmp_hdr->icmp_id);
+			
 			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_icmp);
 			if(copy==NULL){
 				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_icmp);
@@ -506,7 +515,7 @@ void handle_nat(struct sr_instance* sr,
 			
 		}
 		else if(action == FORWARD){
-			aux_int = ntohs(icmp_hdr->icmp_id);
+			
 			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_icmp);
 			if(copy==NULL){
 				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_icmp);
@@ -519,5 +528,89 @@ void handle_nat(struct sr_instance* sr,
 				fprintf(stderr, "CANNOT FORWARD IP PACKET \n");
 			}
 		}
+		free(copy);
 	}
+	else if(iphdr->ip_p == ip_protocol_tcp){
+		sr_tcp_hdr_t *tcp_header = (sr_tcp_hdr_t *)(packet+sizeof(sr_ethernet_hdr_t)+sizeof(sr_ip_hdr_t));
+		
+
+		if(iphdr->ip_dst==sr->nat->ip_ext){
+			aux_int = ntohs(tcp_header->aux_dst);
+			printf("synack? %lu\n",aux_int);
+			copy = sr_nat_lookup_external(sr->nat, aux_int, nat_mapping_tcp);
+			
+			if(copy){
+				iphdr->ip_dst = copy->ip_int;
+				tcp_header->aux_dst= htons(copy->aux_int);
+				struct sr_arpentry* entry = sr_arpcache_lookup(cache, iphdr->ip_dst);
+				sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
+				iface = sr_get_interface(sr, outgoing_iface);
+				sr_tcp_conn_handle(sr, copy, packet, len, INCOMING);
+				if(entry && entry->valid == 1){/*cache hit*/
+					
+					
+					memcpy(eth_hdr->ether_dhost, entry->mac, sizeof(uint8_t)*ETHER_ADDR_LEN);
+					memcpy(eth_hdr->ether_shost, iface->addr, sizeof(uint8_t)*ETHER_ADDR_LEN);
+
+					iphdr->ip_sum = 0;
+					iphdr->ip_ttl--;
+					iphdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
+					tcp_header->checksum= tcp_cksum(packet,len);
+					if (sr_send_packet(sr, packet, len, iface->name) == -1 ) {
+						fprintf(stderr, "CANNOT FORWARD IP PACKET \n");
+					}
+				}
+				else{
+					sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
+				}
+				free(copy);
+			}
+			else{
+				printf("bumboclod\n");
+			}
+			return;
+		}
+
+		aux_int = ntohs(tcp_header->aux_src);
+		printf("auaxind %lu\n", aux_int);
+		if(action == QUEUE){
+			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_tcp);
+			if(copy==NULL){
+				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_tcp);
+			}
+			iphdr->ip_src = copy->ip_ext;
+			printf("auz ext %lu\n", copy->aux_ext);
+        	tcp_header->aux_src= htons(copy->aux_ext);
+        	tcp_header->checksum= tcp_cksum(packet,len);
+        	sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
+			sr_tcp_conn_handle(sr, copy, packet, len, OUTGOING);
+			sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
+		}
+
+	}
+}
+uint16_t tcp_cksum(uint8_t* packet, int len){
+
+  sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(packet + sizeof(struct sr_ethernet_hdr));
+  sr_tcp_hdr_t *tcp_header = (sr_tcp_hdr_t *)(packet + sizeof(struct sr_ethernet_hdr) + sizeof(struct sr_ip_hdr));
+
+  sr_tcp_pshdr_t *tcp_pshdr = calloc(1,sizeof(struct sr_tcp_pshdr));
+  tcp_pshdr->ip_src = iphdr->ip_src;
+  tcp_pshdr->ip_dst = iphdr->ip_dst;
+  tcp_pshdr->ip_p = iphdr->ip_p;
+  uint16_t tcp_length = len-sizeof(struct sr_ethernet_hdr)-sizeof(struct sr_ip_hdr);
+  tcp_pshdr->len = htons(tcp_length);
+
+  tcp_header->checksum = 0; 
+
+  uint8_t *total_tcp = calloc(1, sizeof(struct sr_tcp_pshdr)+tcp_length);
+  memcpy(total_tcp,tcp_pshdr, sizeof(struct sr_tcp_pshdr));
+  memcpy((total_tcp+sizeof(struct sr_tcp_pshdr)), tcp_header, tcp_length);
+
+  uint16_t checksum = cksum(total_tcp, sizeof(struct sr_tcp_pshdr)+tcp_length);
+  
+  free(tcp_pshdr);
+  free(total_tcp);
+
+  return checksum;
 }
