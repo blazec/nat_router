@@ -262,13 +262,15 @@ void handle_icmp(struct sr_instance* sr,
 	struct sr_arpcache *cache = &(sr->cache);
 	if(type == 3 || type == 11){
 		int new_len = sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t) + sizeof(uint8_t)*ICMP_DATA_SIZE;
+		uint8_t* new_packet = (uint8_t*) malloc(new_len);
 		if (new_len>len){
-			uint8_t* new_packet = (uint8_t*) malloc(new_len);
-			
 			memcpy(new_packet, packet, len);
-			len = new_len;
-			packet = new_packet;
 		}
+		else{
+			memcpy(new_packet, packet, new_len);
+		}
+		len = new_len;
+		packet = new_packet;
 	}
 	sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t*) packet;
 
@@ -304,25 +306,17 @@ void handle_icmp(struct sr_instance* sr,
 	else if(type == 3 || type == 11){
 		
 		sr_icmp_t3_hdr_t* icmp_hdr = (sr_icmp_t3_hdr_t *)icmp_data;
+
+		ip_hdr->ip_len = htons(len);
+		/*ip_hdr->ip_dst = iface->ip;*/
+		icmp_hdr->icmp_type = (uint8_t)type;
+		icmp_hdr->icmp_code = (uint8_t)code;
+		icmp_hdr->icmp_sum = 0;
 		
 		
-	
-		/*if(icmp_hdr->icmp_type != (uint8_t)type){*/
-			ip_hdr->ip_len = htons(len);
-			/*ip_hdr->ip_dst = iface->ip;*/
-			icmp_hdr->icmp_type = (uint8_t)type;
-			icmp_hdr->icmp_code = (uint8_t)code;
-			icmp_hdr->icmp_sum = 0;
-			
-			
-			memcpy(icmp_hdr->data, icmp_payload, sizeof(uint8_t)*ICMP_DATA_SIZE);
-			icmp_hdr->icmp_sum = cksum(icmp_hdr, (len-(sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t))));
-		/*}*/
-		/*else{
-			printf("SENDING 11 TO IF: %s\n", iface->name);
-			ip_hdr->ip_dst = iface->ip;
-		}*/
-		
+		memcpy(icmp_hdr->data, icmp_payload, sizeof(uint8_t)*ICMP_DATA_SIZE);
+		icmp_hdr->icmp_sum = cksum(icmp_hdr, (len-(sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t))));
+
 	}
 	sr_longest_prefix_iface(sr, ip_hdr->ip_src, outgoing_iface);
 	out_iface = sr_get_interface(sr, outgoing_iface);
@@ -332,18 +326,8 @@ void handle_icmp(struct sr_instance* sr,
 	
 	if(entry && entry->valid == 1){
 		
-		/*bzero(eth_hdr->ether_dhost, 6);*/
-		
 		memcpy(eth_hdr->ether_dhost, entry->mac, sizeof(uint8_t)*ETHER_ADDR_LEN);
 		memcpy(eth_hdr->ether_shost, out_iface->addr, sizeof(uint8_t)*ETHER_ADDR_LEN);
-		/*eth_hdr->ether_type = htons(ethertype_ip);*/
-
-		
-		/*print_addr_ip_int(ntohl(iface->ip));
-		
-		
-	
-		/*print_addr_ip_int(ntohl(entry->ip));
 
 		/* Create IP packet */
 		
