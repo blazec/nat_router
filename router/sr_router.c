@@ -262,10 +262,13 @@ void handle_icmp(struct sr_instance* sr,
 	struct sr_arpcache *cache = &(sr->cache);
 	if(type == 3 || type == 11){
 		int new_len = sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t) + sizeof(uint8_t)*ICMP_DATA_SIZE;
-		uint8_t* new_packet = (uint8_t*) malloc(new_len);
-		memcpy(new_packet, packet, len);
-		len = new_len;
-		packet = new_packet;
+		if (new_len>len){
+			uint8_t* new_packet = (uint8_t*) malloc(new_len);
+			printf("lenghts %d, %d\n", len, new_len);
+			memcpy(new_packet, packet, len);
+			len = new_len;
+			packet = new_packet;
+		}
 	}
 	sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t*) packet;
 
@@ -582,6 +585,8 @@ void handle_nat(struct sr_instance* sr,
 				handle_icmp(sr, packet, len,iface, 3, 3);
 			}
 			else{/* this is when we keep an uncolicited syn*/
+				uint8_t* new_packet = (uint8_t*) malloc(len);
+				memcpy(new_packet, packet, len);
 				copy = sr_nat_insert_unsol_mapping(sr->nat, packet, len);
 
 			}

@@ -74,14 +74,15 @@ int sr_nat_destroy(struct sr_nat *nat) {  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
   struct sr_instance *sr = sr_ptr;
   struct sr_nat *nat = sr->nat;
+  char outgoing_iface[sr_IFACE_NAMELEN];
   while (1) {
     sleep(1.0);
     pthread_mutex_lock(&(nat->lock));
-    /*
-    int mapping_time, conn_time;
+    
+    int mapping_time=0, conn_time =0;
     time_t curtime = time(NULL);
 
-
+    printf("currtime %d\n", curtime);
     struct sr_nat_mapping *mapping = nat->mappings;
     while(mapping){
       mapping_time = difftime(curtime,mapping->last_updated);
@@ -90,7 +91,7 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
           sr_nat_delete_mapping(nat,mapping);
         }
         else{
-          struct sr_nat_connection *prev, *conn = mapping->conns;
+          struct sr_nat_connection *prev=NULL, *conn = mapping->conns;
           while(conn){
             conn_time = difftime(curtime, conn->last_updated);
             printf("timeee %d\n", conn_time);
@@ -98,11 +99,20 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
                 uint8_t* ip_data = conn->packet +  sizeof(sr_ethernet_hdr_t);
                 sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(ip_data);
 
-                struct sr_if* iface = sr_get_interface_byip(sr, iphdr->ip_src);
+                sr_longest_prefix_iface(sr, iphdr->ip_src, outgoing_iface);
+                struct sr_if* iface = sr_get_interface(sr, outgoing_iface);
+                
+                printf(" naaaame %s\n", iface->name);
                 handle_icmp(sr, conn->packet, conn->len, iface, 3, 3);
                 
-                free(conn->packet);
-                prev->next = conn->next;
+                /*free(conn->packet);*/
+                if (prev){
+                  prev->next = conn->next;
+                }
+                else{
+                  mapping->conns = conn->next;
+                }
+
               }
               prev=conn;
               conn=conn->next;
@@ -113,7 +123,7 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
       
 
     }
-    */
+
     pthread_mutex_unlock(&(nat->lock));
   }
   return NULL;
@@ -311,7 +321,7 @@ struct sr_nat_mapping *sr_nat_insert_unsol_mapping(struct sr_nat *nat, uint8_t *
   conn->packet = packet;
   conn->len=len;
   conn->next = NULL;
-
+  conn->last_updated = curtime;
   mapping->conns = conn;
 
   if(nat->next_port>MAX_PORT){
