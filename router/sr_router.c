@@ -258,20 +258,29 @@ void handle_icmp(struct sr_instance* sr,
 {
 	char outgoing_iface[sr_IFACE_NAMELEN];
 
-	struct sr_arpcache *cache = &(sr->cache);
 
+	struct sr_arpcache *cache = &(sr->cache);
+	if(type == 3 || type == 11){
+		int new_len = sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t) + sizeof(uint8_t)*ICMP_DATA_SIZE;
+		uint8_t* new_packet = (uint8_t*) malloc(new_len);
+		memcpy(new_packet, packet, len);
+		len = new_len;
+		packet = new_packet;
+	}
 	sr_ethernet_hdr_t *eth_hdr = (sr_ethernet_hdr_t*) packet;
 
 	uint8_t* ip_data = packet +  sizeof(sr_ethernet_hdr_t);
 	sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t *)(ip_data);
-
-	uint8_t* icmp_payload = (uint8_t*) malloc((sizeof(sr_ip_hdr_t) +8));
-	memcpy(icmp_payload, ip_data, (sizeof(sr_ip_hdr_t) +8));
+	printf("maklox\n");
+	uint8_t* icmp_payload = (uint8_t*) malloc(sizeof(uint8_t)*ICMP_DATA_SIZE);
+	printf("%d\n", sizeof(sr_ip_hdr_t) +8);
+	memcpy(icmp_payload, ip_data, sizeof(uint8_t)*ICMP_DATA_SIZE);
 
 	struct sr_arpentry* entry = sr_arpcache_lookup(cache, ip_hdr->ip_src);
 	sr_longest_prefix_iface(sr, ip_hdr->ip_src, outgoing_iface);
 
 	uint8_t* icmp_data = packet +  sizeof(sr_ethernet_hdr_t)+  sizeof(sr_ip_hdr_t);
+
 
 	uint32_t ip_src = ip_hdr->ip_src;
 	
@@ -290,20 +299,20 @@ void handle_icmp(struct sr_instance* sr,
 		icmp_hdr->icmp_sum = cksum(icmp_hdr, (len-(sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t))));
 	}
 	else if(type == 3 || type == 11){
-		len = 70;
+		
 		sr_icmp_t3_hdr_t* icmp_hdr = (sr_icmp_t3_hdr_t *)icmp_data;
 		printf("i should not be here\n");
 		
-		
-
+	
 		/*if(icmp_hdr->icmp_type != (uint8_t)type){*/
-			ip_hdr->ip_len = htons(56);
+			ip_hdr->ip_len = htons(len);
 			/*ip_hdr->ip_dst = iface->ip;*/
 			icmp_hdr->icmp_type = (uint8_t)type;
 			icmp_hdr->icmp_code = (uint8_t)code;
-			bzero(&(icmp_hdr->icmp_sum), 2);
+			icmp_hdr->icmp_sum = 0;
 			
-			memcpy(icmp_hdr->data, icmp_payload, (sizeof(sr_ip_hdr_t) +8));
+			
+			memcpy(icmp_hdr->data, icmp_payload, sizeof(uint8_t)*ICMP_DATA_SIZE);
 			icmp_hdr->icmp_sum = cksum(icmp_hdr, (len-(sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t))));
 		/*}*/
 		/*else{
@@ -448,7 +457,8 @@ void handle_nat(struct sr_instance* sr,
 				uint8_t* packet,
 				int len,
 				const char* name,
-				int action){
+				int action)
+{
 	struct sr_if* iface=0;
 	char outgoing_iface[sr_IFACE_NAMELEN];
 	bzero(outgoing_iface, sr_IFACE_NAMELEN);
