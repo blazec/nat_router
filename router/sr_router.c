@@ -561,6 +561,7 @@ void handle_nat(struct sr_instance* sr,
 					}
 				}
 				else{
+					tcp_header->checksum= tcp_cksum(packet,len);
 					sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
 				}
 				free(copy);
@@ -575,6 +576,7 @@ void handle_nat(struct sr_instance* sr,
 
 		aux_int = ntohs(tcp_header->aux_src);
 		printf("auaxind %lu\n", aux_int);
+
 		if(action == QUEUE){
 			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_tcp);
 			if(copy==NULL){
@@ -588,6 +590,23 @@ void handle_nat(struct sr_instance* sr,
 			sr_tcp_conn_handle(sr, copy, packet, len, OUTGOING);
 			sr_arpcache_queuereq(cache, iphdr->ip_dst, packet, len, outgoing_iface);
 		}
+		else if(action == FORWARD){
+			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_tcp);
+			if(copy==NULL){
+				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_tcp);
+			}
+			iphdr->ip_src = copy->ip_ext;
+			iphdr->ip_sum = 0;
+			iphdr->ip_sum = cksum(iphdr, sizeof(sr_ip_hdr_t));
+			tcp_header->aux_src= htons(copy->aux_ext);
+        	tcp_header->checksum= tcp_cksum(packet,len);
+			sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
+			sr_tcp_conn_handle(sr, copy, packet, len, OUTGOING);
+			if (sr_send_packet(sr, packet, len, outgoing_iface) == -1 ) {
+				fprintf(stderr, "CANNOT FORWARD IP PACKET \n");
+			}
+		}
+		free(copy);
 
 	}
 }
