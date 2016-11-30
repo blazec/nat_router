@@ -45,7 +45,7 @@ int sr_nat_init(struct sr_instance *sr, int icmp_to, int tcp_est_to, int tcp_tra
   nat->icmp_to=icmp_to;
   nat->tcp_est_to=tcp_est_to;
   nat->tcp_trans_to=tcp_trans_to;
-  
+
   printf("ICMP TIMEOUT: %d\n", icmp_to);
   printf("TCP EST TIMEOUT: %d\n", tcp_est_to);
   printf("ICMP TIMEOUT: %d\n", tcp_trans_to);
@@ -90,7 +90,7 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
     int mapping_time=0, conn_time =0;
     time_t curtime = time(NULL);
 
-    printf("currtime %d\n", curtime);
+    
     struct sr_nat_mapping *mapping = nat->mappings;
     while(mapping){
       mapping_time = difftime(curtime,mapping->last_updated);
@@ -121,10 +121,9 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
                 sr_longest_prefix_iface(sr, iphdr->ip_src, outgoing_iface);
                 struct sr_if* iface = sr_get_interface(sr, outgoing_iface);
 
-                printf(" naaaame %s\n", iface->name);
+          
                 handle_icmp(sr, conn->packet, conn->len, iface, 3, 3);
-                
-                free(conn->packet);
+              
                 sr_nat_delete_conn(mapping, prev, conn);
 
               }

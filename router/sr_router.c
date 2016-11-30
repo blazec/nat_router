@@ -264,7 +264,7 @@ void handle_icmp(struct sr_instance* sr,
 		int new_len = sizeof(sr_ethernet_hdr_t)+ sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t) + sizeof(uint8_t)*ICMP_DATA_SIZE;
 		if (new_len>len){
 			uint8_t* new_packet = (uint8_t*) malloc(new_len);
-			printf("lenghts %d, %d\n", len, new_len);
+			
 			memcpy(new_packet, packet, len);
 			len = new_len;
 			packet = new_packet;
@@ -274,7 +274,7 @@ void handle_icmp(struct sr_instance* sr,
 
 	uint8_t* ip_data = packet +  sizeof(sr_ethernet_hdr_t);
 	sr_ip_hdr_t* ip_hdr = (sr_ip_hdr_t *)(ip_data);
-	printf("maklox\n");
+	
 	uint8_t* icmp_payload = (uint8_t*) malloc(sizeof(uint8_t)*ICMP_DATA_SIZE);
 	printf("%d\n", sizeof(sr_ip_hdr_t) +8);
 	memcpy(icmp_payload, ip_data, sizeof(uint8_t)*ICMP_DATA_SIZE);
@@ -304,7 +304,7 @@ void handle_icmp(struct sr_instance* sr,
 	else if(type == 3 || type == 11){
 		
 		sr_icmp_t3_hdr_t* icmp_hdr = (sr_icmp_t3_hdr_t *)icmp_data;
-		printf("i should not be here\n");
+		
 		
 	
 		/*if(icmp_hdr->icmp_type != (uint8_t)type){*/
@@ -350,7 +350,7 @@ void handle_icmp(struct sr_instance* sr,
 		bzero(&(ip_hdr->ip_sum), 2);
 		ip_hdr->ip_sum = cksum(ip_hdr, 4*(ip_hdr->ip_hl));
 		/*cksum(ip_data, sizeof(sr_ip_hdr_t));*/
-		printf("hit %s\n", outgoing_iface);
+		
 		if (sr_send_packet(sr, packet, len, outgoing_iface) == -1 ) {
 					fprintf(stderr, "CANNOT SEND ICMP PACKET \n");
 				}
@@ -549,7 +549,7 @@ void handle_nat(struct sr_instance* sr,
 
 		if(iphdr->ip_dst==sr->nat->ip_ext){
 			aux_int = ntohs(tcp_header->aux_dst);
-			printf("synack? %lu\n",aux_int);
+			
 			copy = sr_nat_lookup_external(sr->nat, aux_int, nat_mapping_tcp);
 			
 			if(copy){
@@ -580,7 +580,7 @@ void handle_nat(struct sr_instance* sr,
 				free(copy);
 			}
 			else if(aux_int <= 1023){
-				printf("bumboclod\n");
+				
 				iface = sr_get_interface(sr, name);
 				handle_icmp(sr, packet, len,iface, 3, 3);
 			}
@@ -594,7 +594,7 @@ void handle_nat(struct sr_instance* sr,
 		}
 
 		aux_int = ntohs(tcp_header->aux_src);
-		printf("auaxind %lu\n", aux_int);
+		
 
 		if(action == QUEUE){
 			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_tcp);
@@ -604,7 +604,7 @@ void handle_nat(struct sr_instance* sr,
 				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_tcp);
 			}
 			iphdr->ip_src = copy->ip_ext;
-			printf("auz ext %lu\n", copy->aux_ext);
+			
         	tcp_header->aux_src= htons(copy->aux_ext);
         	tcp_header->checksum= tcp_cksum(packet,len);
         	sr_longest_prefix_iface(sr, iphdr->ip_dst, outgoing_iface);
