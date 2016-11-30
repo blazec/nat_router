@@ -567,6 +567,8 @@ void handle_nat(struct sr_instance* sr,
 			}
 			else{
 				printf("bumboclod\n");
+				iface = sr_get_interface(sr, name);
+				handle_icmp(sr, packet, len,iface, 3, 0);
 			}
 			return;
 		}
