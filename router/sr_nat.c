@@ -121,7 +121,6 @@ void *sr_nat_timeout(void *sr_ptr) {  /* Periodic Timout handling */
                 sr_longest_prefix_iface(sr, iphdr->ip_src, outgoing_iface);
                 struct sr_if* iface = sr_get_interface(sr, outgoing_iface);
 
-          
                 handle_icmp(sr, conn->packet, conn->len, iface, 3, 3);
               
                 sr_nat_delete_conn(mapping, prev, conn);
