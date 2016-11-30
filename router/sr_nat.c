@@ -195,13 +195,15 @@ void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *copy, uin
     mapping = mapping->next;
   }
   printf("check1\n");
+  uint32_t ip_dst;
+  uint16_t aux_dst;
   if(direction == INCOMING){
-    uint32_t ip_dst = ntohs(iphdr->ip_src);
-    uint16_t aux_dst = ntohs(tcp_header->aux_src);
+    ip_dst = ntohs(iphdr->ip_src);
+    aux_dst = ntohs(tcp_header->aux_src);
   }
   else{
-    uint32_t ip_dst = ntohs(iphdr->ip_dst);
-    uint16_t aux_dst = ntohs(tcp_header->aux_dst);
+    ip_dst = ntohs(iphdr->ip_dst);
+    aux_dst = ntohs(tcp_header->aux_dst);
   }
   
 
@@ -218,24 +220,26 @@ void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *copy, uin
       pthread_mutex_unlock(&(nat->lock));
       return;
     }
-    struct sr_nat_connection *new_conn = malloc(sizeof(struct sr_nat_connection));
-    new_conn->ip_dst=ip_dst;
-    new_conn->aux_dst=aux_dst;
-    new_conn->state=nat_conn_syn;
-    new_conn->packet = NULL;
-    new_conn->next = NULL;
+    conn = malloc(sizeof(struct sr_nat_connection));
+    conn->ip_dst=ip_dst;
+    conn->aux_dst=aux_dst;
+    conn->state=nat_conn_syn;
+    conn->packet = NULL;
+    conn->next = NULL;
 
-    conn = mapping->conns;
-    if(conn){
-      while(conn->next){
-        conn=conn->next;
+    struct sr_nat_connection *runner = mapping->conns;
+    if(runner){
+      while(runner->next){
+        runner=runner->next;
       }
-      conn->next = new_conn;
+      runner->next = conn;
     }
     else{
-      mapping->conns = new_conn;
+      mapping->conns = conn;
     }
   }
+
+
 
 
   pthread_mutex_unlock(&(nat->lock));

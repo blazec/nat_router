@@ -91,7 +91,7 @@ int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
 
 void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *map, 
-  uint8_t * packet, int len);
+  uint8_t * packet, int len, int direction);
 
 /* Get the mapping associated with given external port.
    You must free the returned structure if it is not NULL. */
