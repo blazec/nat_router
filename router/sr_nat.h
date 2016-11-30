@@ -51,9 +51,9 @@ struct sr_nat_connection {
   uint16_t aux_dst;
 
   sr_nat_conn_states state;
-
+  int len;
   uint8_t* packet;
-  int time_wait;
+  time_t last_updated;
   struct sr_nat_connection *next;
 };
 
@@ -89,6 +89,7 @@ struct sr_nat {
 int   sr_nat_init(struct sr_instance *sr);     /* Initializes the nat */
 int   sr_nat_destroy(struct sr_nat *nat);  /* Destroys the nat (free memory) */
 void *sr_nat_timeout(void *nat_ptr);  /* Periodic Timout */
+void sr_nat_delete_mapping(struct sr_nat *nat, struct sr_nat_mapping *map);
 
 void sr_tcp_conn_handle(struct sr_instance *sr, struct sr_nat_mapping *map, 
   uint8_t * packet, int len, int direction);
@@ -109,6 +110,7 @@ struct sr_nat_mapping *sr_nat_insert_mapping(struct sr_nat *nat,
   uint32_t ip_int,  uint16_t aux_int,  
   sr_nat_mapping_type type );
 
-
+struct sr_nat_mapping *sr_nat_insert_unsol_mapping(struct sr_nat *nat, uint8_t *packet, int len);
+struct sr_nat_mapping *sr_nat_lookup_waiting_syn(struct sr_nat *nat, uint32_t ip_dst, uint16_t aux_dst);
 
 #endif

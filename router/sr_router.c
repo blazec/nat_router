@@ -576,10 +576,14 @@ void handle_nat(struct sr_instance* sr,
 				}
 				free(copy);
 			}
-			else{
+			else if(aux_int <= 1023){
 				printf("bumboclod\n");
 				iface = sr_get_interface(sr, name);
 				handle_icmp(sr, packet, len,iface, 3, 3);
+			}
+			else{/* this is when we keep an uncolicited syn*/
+				copy = sr_nat_insert_unsol_mapping(sr->nat, packet, len);
+
 			}
 			return;
 		}
@@ -590,6 +594,8 @@ void handle_nat(struct sr_instance* sr,
 		if(action == QUEUE){
 			copy = sr_nat_lookup_internal(sr->nat, iphdr->ip_src, aux_int, nat_mapping_tcp);
 			if(copy==NULL){
+				copy = sr_nat_lookup_waiting_syn(sr->nat, iphdr->ip_dst, tcp_header->aux_dst);
+				sr_nat_delete_mapping(sr->nat, copy);
 				copy = sr_nat_insert_mapping(sr->nat, iphdr->ip_src,  aux_int,  nat_mapping_tcp);
 			}
 			iphdr->ip_src = copy->ip_ext;

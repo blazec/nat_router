@@ -142,7 +142,7 @@ struct sr_tcp_hdr{
   uint16_t aux_src; /*source port*/
   uint16_t aux_dst; /*destination port*/
   uint32_t tcp_seq; /*sequence number*/
-  uint32_t tcp_ack;
+  uint32_t ack_number;
   uint8_t unused;
   uint8_t flags; /*[i=3+j=3+k=10], i is data offset, j is reserved, and k are the flags*/
   uint16_t window_size;
